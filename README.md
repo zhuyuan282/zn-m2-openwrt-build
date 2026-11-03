@@ -28,7 +28,8 @@
 
 ## 文件说明
 
-- `.github/workflows/build-zn-m2.yml` — 云编译流水线
+- `.github/workflows/build-zn-m2.yml` — 极简触发器（真正的编译逻辑在 build.sh 里，方便维护）
+- `build.sh` — 完整编译脚本：装环境、拉源码、配 feeds、编译、发 Release
 - `configs/zn_m2_nowifi.config` — 设备与插件配置（改插件改这里）
 - `diy-part1.sh` — 编译前添加 PassWall 官方 feeds
-- `diy-part2.sh` — 编译前拉取 DDNSTO 插件并做小调整
+- `diy-part2.sh` — 编译前拉取 DDNSTO 插件、清空 root 密码等

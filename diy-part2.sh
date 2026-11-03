@@ -8,7 +8,7 @@ git_sparse_clone() {
   cd tmp_ddnsto_src
   git sparse-checkout set "$@"
   for d in "$@"; do
-    [ -d "$d" ] && mv -f "$d" ../package/
+    [ -d "$d" ] && mv -f "$d" package/
   done
   cd ..
   rm -rf tmp_ddnsto_src
