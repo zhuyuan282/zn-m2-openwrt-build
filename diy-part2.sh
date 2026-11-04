@@ -28,6 +28,14 @@ clone_pkg main https://github.com/linkease/nas-packages-luci luci/luci-app-ddnst
 clone_pkg master https://github.com/linkease/nas-packages network/services/ddnsto || exit 1
 # File transfer — dropped from upstream LuCI feeds; take it from LEDE's feed.
 clone_pkg master https://github.com/coolsnowwolf/luci applications/luci-app-filetransfer || exit 1
+# LEDE apps end their Makefile with a relative `include ../../luci.mk`, which
+# only resolves inside a luci feed tree. In package/ it points at a missing
+# file, the package metadata scan skips it, and defconfig silently drops it
+# (this is what tripped build #4's config gate). Rewrite to the absolute path.
+FT_MK="package/luci-app-filetransfer/Makefile"
+sed -i 's|include ../../luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' "$FT_MK"
+grep -q 'feeds/luci/luci.mk' "$FT_MK" || { echo "ERROR: filetransfer luci.mk include patch did not apply" >&2; exit 1; }
+echo 'filetransfer luci.mk include fixed'
 
 # --- Fix build #2 failure: immortalwrt's sing-box force-enables its Naive
 # outbound (def_bool y), which drags in libcronet -> gn (host). The latest gn
