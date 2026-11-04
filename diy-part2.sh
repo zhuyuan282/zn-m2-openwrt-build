@@ -1,20 +1,33 @@
 #!/bin/bash
 # DRAFT v0.1 — diy-part2: runs after .config is loaded, before defconfig/download.
 
-# --- DDNSTO (linkease) : sparse-clone luci-app-ddnsto + ddnsto service ---
-git_sparse_clone() {
-  branch="$1" repourl="$2" && shift 2
-  git clone --depth=1 -b "$branch" --single-branch --filter=blob:none --sparse "$repourl" tmp_ddnsto_src
-  cd tmp_ddnsto_src
-  git sparse-checkout set "$@"
-  for d in "$@"; do
-    [ -d "$d" ] && mv -f "$d" package/
-  done
-  cd ..
-  rm -rf tmp_ddnsto_src
+# --- Extra packages cloned into package/ -------------------------------------
+# Fail-fast helper: build #3 silently shipped WITHOUT DDNSTO because the old
+# mv-based helper moved the clone into a non-existent package/ dir inside the
+# temp clone and then deleted it. This version copies from the openwrt root,
+# verifies the Makefile exists, and aborts the whole build if a required
+# package did not land.
+clone_pkg() {
+  # $1=branch $2=repo-url $3=path-in-repo ; lands in package/<basename>
+  local base
+  base=$(basename "$3")
+  rm -rf tmp_clone_src
+  git clone --depth=1 -b "$1" --single-branch --filter=blob:none --sparse "$2" tmp_clone_src || return 1
+  git -C tmp_clone_src sparse-checkout set "$3" || return 1
+  if [ ! -f "tmp_clone_src/$3/Makefile" ]; then
+    echo "ERROR: $3/Makefile not found in $2" >&2
+    return 1
+  fi
+  rm -rf "package/$base"
+  cp -a "tmp_clone_src/$3" "package/$base"
+  rm -rf tmp_clone_src
+  echo "cloned package/$base from $2"
 }
-git_sparse_clone main https://github.com/linkease/nas-packages-luci luci/luci-app-ddnsto
-git_sparse_clone master https://github.com/linkease/nas-packages network/services/ddnsto
+# DDNSTO (linkease) — hard requirement: the user's remote-access path.
+clone_pkg main https://github.com/linkease/nas-packages-luci luci/luci-app-ddnsto || exit 1
+clone_pkg master https://github.com/linkease/nas-packages network/services/ddnsto || exit 1
+# File transfer — dropped from upstream LuCI feeds; take it from LEDE's feed.
+clone_pkg master https://github.com/coolsnowwolf/luci applications/luci-app-filetransfer || exit 1
 
 # --- Fix build #2 failure: immortalwrt's sing-box force-enables its Naive
 # outbound (def_bool y), which drags in libcronet -> gn (host). The latest gn

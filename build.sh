@@ -53,6 +53,15 @@ fi
 # ---------- download & compile ----------
 cd openwrt || exit 1
 make defconfig
+# Fail fast (minute ~8, not hour ~2) if a must-have package silently dropped
+# out of the config — this is how build #3 shipped without DDNSTO.
+for sym in CONFIG_PACKAGE_luci-app-passwall CONFIG_PACKAGE_luci-app-ddnsto \
+           CONFIG_PACKAGE_ddnsto CONFIG_PACKAGE_luci-app-filetransfer \
+           CONFIG_PACKAGE_xray-core CONFIG_PACKAGE_sing-box \
+           CONFIG_PACKAGE_hysteria CONFIG_PACKAGE_luci-app-cpufreq \
+           CONFIG_PACKAGE_luci-app-upnp CONFIG_PACKAGE_luci-theme-argon; do
+  grep -q "^${sym}=y" .config || { echo "FATAL: required symbol ${sym} missing from .config"; exit 1; }
+done
 make download -j8
 find dl -size -1024c -exec ls -l {} \;
 find dl -size -1024c -exec rm -f {} \;
@@ -70,6 +79,14 @@ df -hT
 cd bin/targets/*/* || exit 1
 rm -rf packages
 ls -lh
+# Final gate: the firmware manifest must actually contain the must-haves
+# before anything is published as a Release.
+MANIFEST=$(ls *.manifest 2>/dev/null | head -1)
+if [ -n "$MANIFEST" ]; then
+  for pkg in luci-app-passwall luci-app-ddnsto ddnsto luci-app-filetransfer xray-core sing-box hysteria; do
+    grep -q "^${pkg} - " "$MANIFEST" || { echo "FATAL: ${pkg} missing from firmware manifest"; exit 1; }
+  done
+fi
 TAG=$(date +"%Y.%m.%d-%H%M")
 cat > /tmp/release-notes.txt <<EOF
 ZN M2 wired-only (no WiFi/USB) · VIKINGYFY immortalwrt qualcommax NSS
