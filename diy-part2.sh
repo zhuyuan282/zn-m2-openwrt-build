@@ -8,11 +8,16 @@
 # verifies the Makefile exists, and aborts the whole build if a required
 # package did not land.
 clone_pkg() {
-  # $1=branch $2=repo-url $3=path-in-repo ; lands in package/<basename>
+  # $1=branch ("default" = repo's default branch) $2=repo-url $3=path-in-repo
+  # lands in package/<basename>
   local base
   base=$(basename "$3")
   rm -rf tmp_clone_src
-  git clone --depth=1 -b "$1" --single-branch --filter=blob:none --sparse "$2" tmp_clone_src || return 1
+  if [ "$1" = "default" ]; then
+    git clone --depth=1 --single-branch --filter=blob:none --sparse "$2" tmp_clone_src || return 1
+  else
+    git clone --depth=1 -b "$1" --single-branch --filter=blob:none --sparse "$2" tmp_clone_src || return 1
+  fi
   git -C tmp_clone_src sparse-checkout set "$3" || return 1
   if [ ! -f "tmp_clone_src/$3/Makefile" ]; then
     echo "ERROR: $3/Makefile not found in $2" >&2
@@ -27,7 +32,12 @@ clone_pkg() {
 clone_pkg main https://github.com/linkease/nas-packages-luci luci/luci-app-ddnsto || exit 1
 clone_pkg master https://github.com/linkease/nas-packages network/services/ddnsto || exit 1
 # File transfer — dropped from upstream LuCI feeds; take it from LEDE's feed.
-clone_pkg master https://github.com/coolsnowwolf/luci applications/luci-app-filetransfer || exit 1
+# NOTE: use the repo's DEFAULT branch, not master. LEDE's master carries an
+# ancient filetransfer (PKG_VERSION 1) that depends on luci-lib-fs, a library
+# removed from modern LuCI — that is what killed build #5 at package/install
+# after everything else (326 packages) had compiled. The default branch has
+# the modernised version (LUCI_DEPENDS +luci-compat, code uses nixio.fs).
+clone_pkg default https://github.com/coolsnowwolf/luci applications/luci-app-filetransfer || exit 1
 # LEDE apps end their Makefile with a relative `include ../../luci.mk`, which
 # only resolves inside a luci feed tree. In package/ it points at a missing
 # file, the package metadata scan skips it, and defconfig silently drops it
